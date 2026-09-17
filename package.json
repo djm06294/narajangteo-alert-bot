@@ -1,0 +1,16 @@
+{
+  "name": "narajangteo-alert-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "나라장터 입찰공고 검색 및 텔레그램 알림봇",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0"
+  }
+}

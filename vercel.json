@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/notify",
+      "schedule": "0 12 * * *"
+    }
+  ],
+  "functions": {
+    "api/notify.js": {
+      "maxDuration": 120
+    },
+    "api/bids.js": {
+      "maxDuration": 60
+    }
+  },
+  "outputDirectory": "public",
+  "framework": null
+}

@@ -1,0 +1,24 @@
+# 비밀값 — 절대 커밋하지 않는다
+.env
+.env.*
+!.env.example
+
+# 인증키가 적힌 원본 메모
+text.txt
+telegram.txt
+
+# 로컬 파일 저장소 (보낸 공고, 알림 이력, 규칙)
+.data/
+
+node_modules/
+.vercel/
+
+# 조달청 참고문서 — data.go.kr 에서 받을 수 있다
+*.docx
+
+# 이 폴더에서만 쓰는 도구 설정
+.claude/
+skills-lock.json
+
+# 에이전트 도구가 설치한 스킬
+.agents/
