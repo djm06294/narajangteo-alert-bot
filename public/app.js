@@ -180,6 +180,77 @@ async function fetchStatus() {
   } catch { /* 상태 표시는 없어도 그만 */ }
 }
 
+/* ---------- 관리자 비밀번호 ---------- */
+// 쓰는 요청(전송·규칙·즐겨찾기)은 서버가 비밀번호를 요구할 수 있다.
+// 처음 401 을 받으면 물어보고, 맞으면 이 브라우저에 기억해 둔다.
+
+const ADMIN_KEY = 'njt-admin-password';
+let pwPrompt = null;   // {resolve, error} — 비밀번호 창이 떠 있을 때
+let pwDraft = '';
+
+function getAdminPw() {
+  try { return localStorage.getItem(ADMIN_KEY) || ''; } catch { return ''; }
+}
+function setAdminPw(pw) {
+  try { pw ? localStorage.setItem(ADMIN_KEY, pw) : localStorage.removeItem(ADMIN_KEY); } catch { /* 무시 */ }
+}
+
+/** 비밀번호 창을 띄우고 입력값(취소하면 null)을 돌려준다. */
+function askPassword(error = '') {
+  return new Promise(resolve => {
+    pwDraft = '';
+    pwPrompt = {resolve, error};
+    render();
+    document.querySelector('[data-focus="adminPw"]')?.focus();
+  });
+}
+
+function closePassword(value) {
+  const p = pwPrompt;
+  pwPrompt = null;
+  pwDraft = '';
+  render();
+  if (p) p.resolve(value);
+}
+
+/** fetch 와 같지만 관리자 비밀번호를 붙이고, 막히면 물어본 뒤 다시 보낸다. */
+async function adminFetch(url, opts = {}) {
+  let error = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const headers = Object.assign({}, opts.headers);
+    const pw = getAdminPw();
+    // 헤더에는 한글을 못 실으므로 인코딩한다. 서버가 되돌린다.
+    if (pw) headers['x-admin-password'] = encodeURIComponent(pw);
+
+    const res = await fetch(url, Object.assign({}, opts, {headers}));
+    if (res.status !== 401) return res;
+
+    if (pw) { setAdminPw(''); error = '비밀번호가 틀렸습니다'; }
+    const entered = await askPassword(error);
+    if (!entered) throw new Error('관리자 비밀번호가 필요합니다');
+    setAdminPw(entered);
+  }
+  throw new Error('비밀번호가 맞지 않습니다');
+}
+
+function passwordHtml() {
+  if (!pwPrompt) return '';
+  return `<button type="button" class="scrim" data-act="pw-cancel" aria-label="닫기"></button>
+  <div class="pw-dialog" role="dialog" aria-label="관리자 비밀번호">
+    <div class="drawer-title">관리자 비밀번호</div>
+    <div class="drawer-note" style="color:var(--muted)">
+      전송·규칙 변경·즐겨찾기는 관리자만 할 수 있습니다. 한 번 입력하면 이 브라우저가 기억합니다.
+    </div>
+    <input type="password" class="text-input" data-field="adminPw" data-focus="adminPw"
+           autocomplete="current-password" value="${esc(pwDraft)}" placeholder="비밀번호">
+    ${pwPrompt.error ? `<div class="tag blocked" style="align-self:flex-start">${esc(pwPrompt.error)}</div>` : ''}
+    <div class="drawer-actions">
+      <button type="button" class="send" data-act="pw-ok">확인</button>
+      <button type="button" class="fav" data-act="pw-cancel">취소</button>
+    </div>
+  </div>`;
+}
+
 function setFavorites(items) {
   favorites = Array.isArray(items) ? items : [];
   favIds = new Set(favorites.map(b => b.id));
@@ -201,7 +272,7 @@ async function fetchFavorites() {
       const known = new Set(favorites.map(b => b.id));
       const moving = legacy.filter(b => b && b.id && !known.has(b.id));
       if (moving.length) {
-        const up = await fetch('/api/favorites', {
+        const up = await adminFetch('/api/favorites', {
           method: 'POST',
           headers: {'content-type': 'application/json'},
           body: JSON.stringify({items: moving})
@@ -249,7 +320,7 @@ async function fetchAlerts() {
 
 /** 지금 이 화면의 설정을 서버에 저장한다. 크론은 localStorage 를 읽을 수 없다. */
 async function saveRulesToServer() {
-  const res = await fetch('/api/rules', {
+  const res = await adminFetch('/api/rules', {
     method: 'POST',
     headers: {'content-type': 'application/json'},
     body: JSON.stringify({
@@ -275,7 +346,7 @@ async function sendOne(bid) {
   sending = bid.id;
   render();
   try {
-    const res = await fetch('/api/send', {
+    const res = await adminFetch('/api/send', {
       method: 'POST',
       headers: {'content-type': 'application/json'},
       body: JSON.stringify(bid)
@@ -715,6 +786,10 @@ function settingsHtml() {
         </button>` : ''}
       <button type="button" class="save" data-act="save-settings">설정 저장</button>
     </div>
+    ${status.adminRequired ? `<div class="page-foot">
+      전송·규칙 변경·즐겨찾기는 관리자 비밀번호가 필요합니다.
+      ${getAdminPw() ? '이 브라우저에 저장됨 · <a href="#" data-act="admin-forget">지우기</a>' : '아직 입력하지 않았습니다.'}
+    </div>` : ''}
     ${isLocal ? '' : `<div class="page-foot">
       배포본에서는 배치를 손으로 돌릴 수 없습니다.
       <span class="mono">/api/notify</span> 는 <span class="mono">CRON_SECRET</span> 을 아는 크론만 부를 수 있게 막아뒀습니다.
@@ -885,7 +960,7 @@ function render() {
   const caret = focusKey && active.selectionStart != null ? active.selectionStart : null;
 
   document.getElementById('app').innerHTML =
-    `<div class="shell">${headerHtml()}${tabsHtml()}${bodyHtml()}</div>` +
+    `<div class="shell">${headerHtml()}${tabsHtml()}${bodyHtml()}</div>` + passwordHtml() +
     (toast ? `<div class="toast" role="status">${esc(toast)}</div>` : '');
 
   if (focusKey) {
@@ -922,12 +997,12 @@ async function toggleFav(id) {
 
   try {
     const res = adding
-      ? await fetch('/api/favorites', {
+      ? await adminFetch('/api/favorites', {
           method: 'POST',
           headers: {'content-type': 'application/json'},
           body: JSON.stringify(bid)
         })
-      : await fetch(`/api/favorites?id=${encodeURIComponent(id)}`, {method: 'DELETE'});
+      : await adminFetch(`/api/favorites?id=${encodeURIComponent(id)}`, {method: 'DELETE'});
 
     const json = await res.json();
     if (!json.ok) throw new Error(json.error);
@@ -976,6 +1051,9 @@ app.addEventListener('click', e => {
       if (bid) sendOne(bid);
       break;
     }
+    case 'pw-ok': closePassword(pwDraft.trim() || null); break;
+    case 'pw-cancel': closePassword(null); break;
+    case 'admin-forget': setAdminPw(''); showToast('이 브라우저에서 관리자 비밀번호를 지웠습니다'); break;
     case 'notify-dry': runNotify({dry: true}); break;
     case 'notify-run': runNotify({dry: false}); break;
     case 'save-settings':
@@ -990,6 +1068,7 @@ app.addEventListener('click', e => {
 app.addEventListener('input', e => {
   const field = e.target.dataset.field;
   if (!field) return;
+  if (field === 'adminPw') { pwDraft = e.target.value; return; }
   const numeric = field === 'maxPrice' || field === 'days' || field === 'lookback';
   set({[field]: numeric ? Number(e.target.value) : e.target.value}, field === 'lookback');
 });
@@ -1002,6 +1081,8 @@ app.addEventListener('keydown', e => {
   const field = e.target.dataset.field;
   if (e.key === 'Enter' && field === 'kwDraft') addWord('keywords', 'kwDraft');
   if (e.key === 'Enter' && field === 'exDraft') addWord('excludes', 'exDraft');
+  if (field === 'adminPw' && e.key === 'Enter') { closePassword(pwDraft.trim() || null); return; }
+  if (e.key === 'Escape' && pwPrompt) { closePassword(null); return; }
   if (e.key === 'Escape' && state.sel) set({sel: null});
   if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset.act === 'open-row') {
     e.preventDefault();

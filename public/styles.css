@@ -469,3 +469,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   .header { height: auto; padding: 10px 16px; flex-wrap: wrap; }
   .page { padding: 20px 16px 60px; }
 }
+
+/* ---------- 관리자 비밀번호 창 ---------- */
+.pw-dialog {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(360px, calc(100vw - 32px)); z-index: 10;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(16, 24, 40, .18);
+  padding: 20px; display: flex; flex-direction: column; gap: 12px;
+}

@@ -3,11 +3,13 @@
 // 브라우저 localStorage 는 크론이 읽을 수 없다. 자동 실행에 쓸 규칙은 서버에 있어야 한다.
 import { getRules, saveRules } from '../lib/store.js';
 import { readJson } from '../lib/http.js';
+import { guardAdmin } from '../lib/auth.js';
 
 export default async function handler(req, res) {
   res.setHeader('content-type', 'application/json; charset=utf-8');
 
   if (req.method === 'POST') {
+    if (!guardAdmin(req, res)) return;
     try {
       const body = await readJson(req);
       // 받은 값 중 규칙에 해당하는 것만 고른다.

@@ -22,6 +22,7 @@
 | `TELEGRAM_CHAT_ID` | 봇에게 아무 말이나 건 뒤 `https://api.telegram.org/bot<토큰>/getUpdates` 의 `chat.id` | 전송이 안 된다 |
 | `DATABASE_URL` | Neon 연결 문자열 (Vercel Marketplace 또는 [neon.tech](https://neon.tech)) | 로컬 파일에 저장된다 |
 | `CRON_SECRET` | 아무 긴 임의 문자열. 배포본에만 설정한다 | `/api/notify` 가 누구에게나 열린다 |
+| `ADMIN_PASSWORD` | 직접 정한 비밀번호. 배포본에만 설정한다 | 누구나 텔레그램 전송·규칙·즐겨찾기를 바꿀 수 있다 |
 
 ### 2. 로컬 실행
 
@@ -49,10 +50,11 @@ vercel env add G2B_SERVICE_KEY production
 vercel env add TELEGRAM_BOT_TOKEN production
 vercel env add TELEGRAM_CHAT_ID production
 vercel env add CRON_SECRET production
+vercel env add ADMIN_PASSWORD production
 vercel deploy --prod
 ```
 
-`CRON_SECRET` 은 **production 에만** 넣는다. 로컬에 있으면 설정 화면의 "지금 한 번 실행" 버튼이 막힌다.
+`CRON_SECRET` 과 `ADMIN_PASSWORD` 는 **production 에만** 넣는다. 로컬에 있으면 로컬에서도 막힌다.
 
 ---
 
@@ -71,6 +73,7 @@ lib/filter.js                           키워드 매칭 (검색과 배치가 �
 lib/telegram.js                         메시지 포맷 + 전송
 lib/store.js                            저장소 고르기 — DATABASE_URL 있으면 Neon
 lib/store-neon.js  lib/store-file.js    두 구현 (함수 모양이 같다)
+lib/auth.js                             관리자 비밀번호 검사
 lib/http.js  lib/env.js                 본문 읽기, .env 읽기
 scripts/dev-server.mjs                  로컬 개발 서버 (배포에는 안 올라감)
 scripts/migrate-to-neon.mjs             .data/ → Neon 이사
@@ -210,10 +213,28 @@ Vercel 이 크론을 부를 때 `Authorization: Bearer $CRON_SECRET` 을 자동�
 
 ---
 
+## 누가 무엇을 할 수 있나
+
+| 요청 | 막는 방법 |
+| --- | --- |
+| 검색, 알림 이력·즐겨찾기·규칙 보기 | 누구나 |
+| 텔레그램 즉시 전송 (`/api/send`) | `ADMIN_PASSWORD` |
+| 규칙 저장 (`POST /api/rules`) | `ADMIN_PASSWORD` |
+| 즐겨찾기 담기·빼기 (`POST`/`DELETE /api/favorites`) | `ADMIN_PASSWORD` |
+| 알림 배치 (`/api/notify`) | `CRON_SECRET` — 크론만 |
+
+화면에서 쓰는 동작을 처음 하면 비밀번호 창이 뜬다. 맞으면 그 브라우저가 기억하고, 설정 탭에서 지울 수 있다.
+비밀번호는 `x-admin-password` 헤더로 가고, 서버는 해시끼리 비교한다(`lib/auth.js`).
+
+> Vercel 의 Deployment Protection 을 쓰지 않은 이유: Hobby 플랜의 Standard Protection 은
+> 배포마다 생기는 주소만 막고 실제 서비스 주소(`<프로젝트>.vercel.app`)는 열어둔다.
+> 전체를 막는 옵션은 Pro 플랜부터다.
+
 ## 알아둘 점
 
-- **사용자 구분이 없다.** 이 앱을 쓰는 사람이 하나라는 전제다. 배포 주소를 아는 사람은 누구나 같은 즐겨찾기와 설정을 보고 고칠 수 있다. 여러 명이 쓰려면 로그인과 테이블별 사용자 열쇠가 필요하다.
-- **인증키를 커밋하지 말 것.** `.env`, `.env.local`, `.data/` 는 `.gitignore` 에 넣어뒀다.
+- **사용자 구분이 없다.** 관리자 비밀번호는 하나뿐이고, 이 앱을 쓰는 사람이 하나라는 전제다. 여러 명이 쓰려면 로그인과 테이블별 사용자 열쇠가 필요하다.
+- **검색은 누구나 부를 수 있다.** 조회 결과를 10분 캐시하긴 하지만, 조회 기간을 바꿔가며 부르면 공고 API 일일 한도를 쓸 수 있다. 한도가 바닥나면 저녁 9시 알림도 실패한다.
+- **인증키를 커밋하지 말 것.** `.env`, `.env.*`(`.env.example` 제외), `.data/` 는 `.gitignore` 에 넣어뒀다.
 
 ## 남은 것
 

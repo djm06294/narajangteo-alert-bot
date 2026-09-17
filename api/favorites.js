@@ -7,6 +7,7 @@
 // 여러 명이 쓰게 되면 favorites 테이블에 사용자 열쇠를 더해야 한다.
 import { listFavorites, addFavorite, removeFavorite } from '../lib/store.js';
 import { readJson } from '../lib/http.js';
+import { guardAdmin } from '../lib/auth.js';
 
 /** 클라이언트가 보낸 것 중 화면에 쓰는 항목만 추린다. */
 function clean(body) {
@@ -28,6 +29,9 @@ function clean(body) {
 export default async function handler(req, res) {
   res.setHeader('content-type', 'application/json; charset=utf-8');
   const reply = (code, body) => { res.statusCode = code; res.end(JSON.stringify(body)); };
+
+  // 보기는 누구나, 담기·빼기는 관리자만.
+  if ((req.method === 'POST' || req.method === 'DELETE') && !guardAdmin(req, res)) return;
 
   try {
     if (req.method === 'POST') {

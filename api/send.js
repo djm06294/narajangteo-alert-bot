@@ -4,12 +4,15 @@ import { markSent, logAlert, hasSent } from '../lib/store.js';
 import { sendMessage, formatBid, isConfigured } from '../lib/telegram.js';
 import { getRules } from '../lib/store.js';
 import { readJson } from '../lib/http.js';
+import { guardAdmin } from '../lib/auth.js';
 
 export default async function handler(req, res) {
   res.setHeader('content-type', 'application/json; charset=utf-8');
   const reply = (code, body) => { res.statusCode = code; res.end(JSON.stringify(body)); };
 
   if (req.method !== 'POST') return reply(405, { ok: false, error: 'POST 만 받습니다' });
+  // 아무나 부를 수 있으면 남이 내 텔레그램으로 링크를 보낼 수 있다.
+  if (!guardAdmin(req, res)) return;
   if (!isConfigured()) return reply(400, { ok: false, error: '텔레그램 토큰이 설정되지 않았습니다' });
 
   try {

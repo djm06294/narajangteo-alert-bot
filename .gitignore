@@ -22,3 +22,6 @@ skills-lock.json
 
 # 에이전트 도구가 설치한 스킬
 .agents/
+
+# 관리자 비밀번호 메모
+admin-password.txt

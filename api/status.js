@@ -1,5 +1,6 @@
 // GET /api/status — 어떤 연결이 준비됐는지 알려준다. 값 자체는 절대 내보내지 않는다.
 import { loadEnv } from '../lib/env.js';
+import { adminRequired } from '../lib/auth.js';
 
 const KEYS = [
   { key: 'G2B_SERVICE_KEY',    note: 'data.go.kr 입찰공고정보서비스 인증키' },
@@ -24,6 +25,7 @@ export default async function handler(req, res) {
     rows,
     search: Boolean(process.env.G2B_SERVICE_KEY),
     telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
-    database: Boolean(process.env.DATABASE_URL)
+    database: Boolean(process.env.DATABASE_URL),
+    adminRequired: adminRequired()
   }));
 }
