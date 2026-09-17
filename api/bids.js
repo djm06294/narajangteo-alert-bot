@@ -5,10 +5,17 @@
 // 인증키를 브라우저에 노출하지 않으려고 조회는 반드시 서버에서 한다.
 import { fetchRecentBids, ALL_TYPES } from '../lib/g2b.js';
 import { applyRules } from '../lib/filter.js';
+import { rateLimit } from '../lib/ratelimit.js';
+
+// IP 하나가 10분에 부를 수 있는 횟수. 화면은 키워드를 바꿀 때마다 한 번씩 부른다.
+const LIMIT = Number(process.env.BIDS_RATE_LIMIT ?? 30);
+const WINDOW_SEC = 10 * 60;
 
 const csv = v => String(v || '').split(',').map(s => s.trim()).filter(Boolean);
 
 export default async function handler(req, res) {
+  if (!(await rateLimit(req, res, { name: 'bids', limit: LIMIT, windowSec: WINDOW_SEC }))) return;
+
   // Vercel 은 req.query 를 주지만, 로컬 개발 서버도 같이 쓰려고 URL 에서 직접 읽는다.
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const p = url.searchParams;
@@ -23,7 +30,8 @@ export default async function handler(req, res) {
     const { bids, errors, range } = await fetchRecentBids({
       types: types.length ? types : ALL_TYPES,
       days,
-      now
+      now,
+      caller: 'search'
     });
 
     const { items, excludedCount } = applyRules(bids, { keywords, excludes }, now);
@@ -47,7 +55,7 @@ export default async function handler(req, res) {
     }));
   } catch (err) {
     res.setHeader('content-type', 'application/json; charset=utf-8');
-    res.statusCode = 502;
+    res.statusCode = err.code === 'QUOTA' ? 429 : 502;
     res.end(JSON.stringify({ ok: false, error: err.message }));
   }
 }

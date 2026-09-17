@@ -74,6 +74,7 @@ lib/telegram.js                         메시지 포맷 + 전송
 lib/store.js                            저장소 고르기 — DATABASE_URL 있으면 Neon
 lib/store-neon.js  lib/store-file.js    두 구현 (함수 모양이 같다)
 lib/auth.js                             관리자 비밀번호 검사
+lib/ratelimit.js                        IP별 요청 횟수 제한
 lib/http.js  lib/env.js                 본문 읽기, .env 읽기
 scripts/dev-server.mjs                  로컬 개발 서버 (배포에는 안 올라감)
 scripts/migrate-to-neon.mjs             .data/ → Neon 이사
@@ -168,6 +169,8 @@ Vercel 이 크론을 부를 때 `Authorization: Bearer $CRON_SECRET` 을 자동�
 | 알림 이력 | `alert_log` |
 | 알림 규칙 | `settings` |
 | 즐겨찾기 | `favorites` |
+| 요청 횟수 제한 | `rate_limits` |
+| 공고 API 사용량 | `api_usage` |
 
 테이블은 첫 질의 때 자동으로 만들어진다. 마이그레이션 도구는 없다.
 
@@ -217,7 +220,8 @@ Vercel 이 크론을 부를 때 `Authorization: Bearer $CRON_SECRET` 을 자동�
 
 | 요청 | 막는 방법 |
 | --- | --- |
-| 검색, 알림 이력·즐겨찾기·규칙 보기 | 누구나 |
+| 검색 (`/api/bids`) | 누구나 — 단, IP당 10분에 30회 |
+| 알림 이력·즐겨찾기·규칙 보기 | 누구나 |
 | 텔레그램 즉시 전송 (`/api/send`) | `ADMIN_PASSWORD` |
 | 규칙 저장 (`POST /api/rules`) | `ADMIN_PASSWORD` |
 | 즐겨찾기 담기·빼기 (`POST`/`DELETE /api/favorites`) | `ADMIN_PASSWORD` |
@@ -233,10 +237,32 @@ Vercel 이 크론을 부를 때 `Authorization: Bearer $CRON_SECRET` 을 자동�
 ## 알아둘 점
 
 - **사용자 구분이 없다.** 관리자 비밀번호는 하나뿐이고, 이 앱을 쓰는 사람이 하나라는 전제다. 여러 명이 쓰려면 로그인과 테이블별 사용자 열쇠가 필요하다.
-- **검색은 누구나 부를 수 있다.** 조회 결과를 10분 캐시하긴 하지만, 조회 기간을 바꿔가며 부르면 공고 API 일일 한도를 쓸 수 있다. 한도가 바닥나면 저녁 9시 알림도 실패한다.
+- **요청 횟수 제한은 IP 기준이다.** IP를 바꿔가며 부르는 상대는 못 막는다. 그래서 공고 API 한도는 따로 지킨다(아래).
 - **인증키를 커밋하지 말 것.** `.env`, `.env.*`(`.env.example` 제외), `.data/` 는 `.gitignore` 에 넣어뒀다.
+
+## 공고 API 한도 지키기
+
+개발계정은 업무유형(오퍼레이션)마다 하루 1,000회까지 부를 수 있다. 검색이 이걸 다 쓰면 저녁 9시 알림이 실패한다. 그래서 세 겹으로 막는다.
+
+| 겹 | 어디서 | 하는 일 |
+| --- | --- | --- |
+| CDN 캐시 | `/api/bids` 응답의 `s-maxage=60` | 같은 주소는 60초 동안 함수까지 오지도 않는다 |
+| IP별 제한 | `lib/ratelimit.js` | IP 하나가 10분에 30회. 넘으면 429 + `Retry-After` |
+| 일일 예산 | `lib/g2b.js` | 검색은 업무유형마다 하루 **700회**까지만 새로 조회한다. 나머지 300회는 크론 몫 |
+
+- 일일 예산은 **캐시에 없어서 실제로 나라장터를 불러야 할 때만** 확인한다. 실제 호출마다 `api_usage` 에 센다
+- 크론(`/api/notify`)은 예산 제한을 받지 않는다. 한 번 도는 데 업무유형당 2~4회 쓴다
+- 날짜는 한국 시간 기준으로 바뀐다
+- 오늘 사용량은 설정 화면의 "연결 상태" 에서 볼 수 있다
+
+카운터 저장소(DB)가 실패하면 IP 제한은 **통과시킨다.** DB 장애 하나로 검색 전체가 막히는 것보다 잠깐 제한이 풀리는 편이 낫다고 봤다.
+
+| 환경변수 | 기본값 |
+| --- | --- |
+| `BIDS_RATE_LIMIT` | 30 (10분당, IP 하나) |
+| `SEARCH_DAILY_CALL_LIMIT` | 700 (하루, 업무유형 하나) |
 
 ## 남은 것
 
 - 참가가능지역을 `getBidPblancListInfoPrtcptPsblRgn` 으로 따로 가져오기
-- 공고 API 호출 한도(오퍼레이션당 하루 1,000회) 모니터링
+- 사용량이 한도에 가까워지면 텔레그램으로 알려주기

@@ -764,6 +764,10 @@ function settingsHtml() {
         <div class="panel-title">연결 상태</div>
         <div class="panel-sub">서버의 .env 에서 읽습니다. 값 자체는 브라우저로 내려오지 않습니다.</div>
       </div>
+      ${status.usage ? `<div class="callout">
+        오늘 공고 API 호출 — ${Object.entries(status.usage).map(([t, n]) => `${t} <span class="mono">${n}</span>`).join(' · ')}
+        <span style="color:var(--muted-3)">(업무유형마다 하루 ${status.usageLimit}회. 검색은 700회까지만 쓰고 나머지는 저녁 알림 몫)</span>
+      </div>` : ''}
       <div>
         ${rows.map(e => `
           <div class="env-row">
