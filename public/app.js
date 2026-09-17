@@ -810,7 +810,7 @@ function settingsHtml() {
 function alertsHtml() {
   const BADGE = {
     sent: ['전송', 'sent'], dup: ['중복', ''], blocked: ['제외', 'blocked'],
-    error: ['오류', 'error'], run: ['실행', '']
+    error: ['오류', 'error'], run: ['실행', ''], warn: ['경고', 'blocked']
   };
 
   // 날짜별로 묶는다.
