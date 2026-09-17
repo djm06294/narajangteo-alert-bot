@@ -5,10 +5,10 @@ import { C, F } from '../theme';
 import { useEnter } from '../ui';
 
 const CARDS = [
-  { icon: '1×', color: C.ok, title: '중복 없이', body: '공고번호와 차수로 기록해\n같은 공고는 두 번 보내지 않습니다' },
-  { icon: '↻', color: C.accent, title: '재공고도 다시', body: '차수가 오르면\n새 공고로 다시 알려드립니다' },
-  { icon: '★', color: C.gold, title: '즐겨찾기', body: '관심 공고를 담아두면\n기기를 바꿔도 그대로 남습니다' },
-  { icon: 'D-2', color: C.urgent, title: '마감 임박 표시', body: '남은 날짜와 추정가격으로\n급한 공고부터 확인합니다' },
+  { icon: '1×', color: C.ok, title: '중복 없이', body: '보낸 공고는 기록해 두고\n두 번 보내지 않습니다' },
+  { icon: '↻', color: C.accent, title: '재공고도 다시', body: '차수가 오르면\n새 공고로 알려드립니다' },
+  { icon: '★', color: C.gold, title: '즐겨찾기', body: '관심 공고를 담아두면\n기기를 바꿔도 남습니다' },
+  { icon: 'D-2', color: C.urgent, title: '마감 임박 표시', body: '남은 날짜를 색으로 보여\n급한 공고부터 봅니다' },
 ];
 
 const Card = ({ i }: { i: number }) => {

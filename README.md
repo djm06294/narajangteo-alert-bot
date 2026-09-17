@@ -5,6 +5,12 @@
 
 화면은 [Claude Design 목업](https://claude.ai/design/p/2e8ce2a8-ea7b-4527-9f47-0cc406aca881)을 그대로 구현했다.
 
+![소개 영상](docs/intro.gif)
+
+> 소개 영상은 [Remotion](https://www.remotion.dev) 으로 만들었다 (`video/`). 화면의 공고는 예시 데이터다.
+> 다시 뽑으려면 `cd video && npm install && npm run render` (MP4) 후
+> `npx remotion render Intro out/intro.gif --codec=gif --every-nth-frame=3 --scale=0.4` 로 GIF 를 만들어 `docs/` 에 복사한다.
+
 - **발송**: 매일 저녁 9시(한국시간). Vercel Cron 이 `/api/notify` 를 부른다
 - **중복 방지**: 보낸 공고번호를 기록해 같은 공고는 다시 보내지 않는다
 - **빌드 없음**: 번들러도 프레임워크도 안 쓴다. 정적 파일 + 서버리스 함수
